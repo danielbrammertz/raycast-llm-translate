@@ -1,6 +1,8 @@
 // llm-pill — bottom-of-screen pill overlay that WRAPS long text (Raycast toasts/HUDs are
 // single-line). Reads the text from stdin, duration in seconds as argv[1] (default 6).
-// Borderless, non-activating (never steals focus), click-through, fades in/out, auto-quits.
+// Borderless and non-activating (never steals focus). A thin line along the bottom edge
+// drains as a countdown; hovering pauses it; a click PINS the pill (pin icon appears);
+// a second click closes it.
 import AppKit
 
 let cliArgs = CommandLine.arguments
@@ -11,6 +13,117 @@ guard var text = String(data: stdinData, encoding: .utf8)?
   .trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty
 else { exit(0) }
 if text.count > 4000 { text = String(text.prefix(4000)) + "…" }
+
+func pauseLayer(_ layer: CALayer) {
+  let t = layer.convertTime(CACurrentMediaTime(), from: nil)
+  layer.speed = 0
+  layer.timeOffset = t
+}
+
+func resumeLayer(_ layer: CALayer) {
+  let paused = layer.timeOffset
+  layer.speed = 1
+  layer.timeOffset = 0
+  layer.beginTime = 0
+  layer.beginTime = layer.convertTime(CACurrentMediaTime(), from: nil) - paused
+}
+
+final class PillView: NSVisualEffectView {
+  enum PillState { case counting, pinned, closing }
+  var pillState: PillState = .counting
+  var remaining: TimeInterval = 6
+  var startedAt = Date()
+  var closeItem: DispatchWorkItem?
+  var progressLayer: CALayer?
+  var pinIcon: NSImageView?
+  weak var pillPanel: NSPanel?
+
+  func startCountdown(width: CGFloat) {
+    let bar = CALayer()
+    bar.backgroundColor = NSColor.white.withAlphaComponent(0.35).cgColor
+    bar.anchorPoint = CGPoint(x: 0, y: 0.5)
+    bar.bounds = CGRect(x: 0, y: 0, width: width, height: 3)
+    bar.position = CGPoint(x: 0, y: 1.5)
+    layer?.addSublayer(bar)
+    progressLayer = bar
+
+    let anim = CABasicAnimation(keyPath: "bounds.size.width")
+    anim.fromValue = width
+    anim.toValue = 0
+    anim.duration = remaining
+    anim.timingFunction = CAMediaTimingFunction(name: .linear)
+    anim.fillMode = .forwards
+    anim.isRemovedOnCompletion = false
+    bar.add(anim, forKey: "countdown")
+
+    scheduleClose()
+  }
+
+  func scheduleClose() {
+    startedAt = Date()
+    let item = DispatchWorkItem { [weak self] in self?.beginClose() }
+    closeItem = item
+    DispatchQueue.main.asyncAfter(deadline: .now() + remaining, execute: item)
+  }
+
+  func pauseCountdown() {
+    guard pillState == .counting else { return }
+    closeItem?.cancel()
+    remaining = max(0.8, remaining - Date().timeIntervalSince(startedAt))
+    if let bar = progressLayer { pauseLayer(bar) }
+  }
+
+  func resumeCountdown() {
+    guard pillState == .counting else { return }
+    if let bar = progressLayer { resumeLayer(bar) }
+    scheduleClose()
+  }
+
+  func beginClose() {
+    guard pillState != .closing else { return }
+    pillState = .closing
+    closeItem?.cancel()
+    guard let panel = pillPanel else { NSApp.terminate(nil); return }
+    NSAnimationContext.runAnimationGroup(
+      { ctx in
+        ctx.duration = 0.35
+        panel.animator().alphaValue = 0
+      },
+      completionHandler: { NSApp.terminate(nil) })
+  }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    trackingAreas.forEach(removeTrackingArea)
+    addTrackingArea(NSTrackingArea(
+      rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self, userInfo: nil))
+  }
+
+  override func mouseEntered(with event: NSEvent) {
+    NSCursor.pointingHand.push()
+    pauseCountdown()
+  }
+
+  override func mouseExited(with event: NSEvent) {
+    NSCursor.pop()
+    resumeCountdown()
+  }
+
+  override func mouseDown(with event: NSEvent) {
+    switch pillState {
+    case .counting:
+      pillState = .pinned
+      closeItem?.cancel()
+      progressLayer?.removeFromSuperlayer()
+      progressLayer = nil
+      pinIcon?.isHidden = false
+    case .pinned:
+      beginClose()
+    case .closing:
+      break
+    }
+  }
+}
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
@@ -56,20 +169,32 @@ panel.level = .statusBar
 panel.isOpaque = false
 panel.backgroundColor = .clear
 panel.hasShadow = true
-panel.ignoresMouseEvents = true
+panel.ignoresMouseEvents = false // the pill is clickable: click pins, second click closes
 panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 panel.appearance = NSAppearance(named: .vibrantDark)
 
-let effect = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: winW, height: winH))
+let effect = PillView(frame: NSRect(x: 0, y: 0, width: winW, height: winH))
 effect.material = .hudWindow
 effect.blendingMode = .behindWindow
 effect.state = .active
 effect.wantsLayer = true
 effect.layer?.cornerRadius = 14
 effect.layer?.masksToBounds = true
+effect.remaining = duration
+effect.pillPanel = panel
 
 label.frame = NSRect(x: hPad, y: vPad, width: textW, height: textH)
 effect.addSubview(label)
+
+let pin = NSImageView(frame: NSRect(x: winW - 20, y: winH - 20, width: 12, height: 12))
+if let img = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "pinned") {
+  pin.image = img
+}
+pin.contentTintColor = NSColor.white.withAlphaComponent(0.55)
+pin.isHidden = true
+effect.addSubview(pin)
+effect.pinIcon = pin
+
 panel.contentView = effect
 
 panel.alphaValue = 0
@@ -79,16 +204,6 @@ NSAnimationContext.runAnimationGroup { ctx in
   ctx.duration = 0.18
   panel.animator().alphaValue = 1
 }
-
-DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-  NSAnimationContext.runAnimationGroup(
-    { ctx in
-      ctx.duration = 0.35
-      panel.animator().alphaValue = 0
-    },
-    completionHandler: { app.terminate(nil) })
-}
-// hard safety exit in case animations/run loop wedge
-DispatchQueue.main.asyncAfter(deadline: .now() + duration + 3) { exit(0) }
+effect.startCountdown(width: winW)
 
 app.run()

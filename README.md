@@ -8,12 +8,14 @@ Two commands:
 
 - **Translate Selection** (the hotkey one) — no window: shows an animated "Translating…" pill
   at the bottom of the screen, then the translation as a pill that **wraps long text over
-  multiple lines** and fades after the configured duration (default 6 s, command settings).
-  Raycast's own HUD/toast is single-line and fixed-duration, so the pill is a tiny native
-  overlay helper (`scripts/pill.swift` → installed at `~/.config/raycast-llm-translate/bin/llm-pill`
-  by `scripts/build-pill.sh`; rebuild it after editing the Swift file). If the binary is
-  missing, the command falls back to a single-line Raycast toast. Optional preference to also
-  copy the result to the clipboard (off by default).
+  multiple lines**. A thin line along the pill's bottom edge drains as the **fade countdown**
+  (duration configurable in the command settings, default 6 s); **hovering pauses** the
+  countdown; **clicking pins** the pill (pin icon appears top-right) and a **second click
+  closes** it. Raycast's own HUD/toast is single-line and fixed-duration, so the pill is a
+  tiny native overlay helper (`scripts/pill.swift` → installed at
+  `~/.config/raycast-llm-translate/bin/llm-pill` by `scripts/build-pill.sh`; rebuild it after
+  editing the Swift file). If the binary is missing, the command falls back to a single-line
+  Raycast toast. Optional preference to also copy the result to the clipboard (off by default).
 - **Translate Selection (Window)** — full Raycast window with **streaming** output and actions:
   **⏎ paste translation** (replaces the selection in the frontmost app), copy, force direction
   (⌘D → primary, ⌘E → secondary language). Better for long texts, since the pill is one line.
