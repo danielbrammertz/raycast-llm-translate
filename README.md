@@ -10,8 +10,8 @@ Two commands:
   at the bottom of the screen, then the translation as a pill that **wraps long text over
   multiple lines**. A thin line along the pill's bottom edge drains as the **fade countdown**
   (duration configurable in the command settings, default 6 s); **hovering pauses** the
-  countdown; **clicking pins** the pill (pin icon appears top-right) and a **second click
-  closes** it. Raycast's own HUD/toast is single-line and fixed-duration, so the pill is a
+  countdown for as long as the cursor stays on the pill — that's how you keep it around.
+  Raycast's own HUD/toast is single-line and fixed-duration, so the pill is a
   tiny native overlay helper (`scripts/pill.swift` → installed at
   `~/.config/raycast-llm-translate/bin/llm-pill` by `scripts/build-pill.sh`; rebuild it after
   editing the Swift file). If the binary is missing, the command falls back to a single-line

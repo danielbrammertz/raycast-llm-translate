@@ -1,8 +1,12 @@
 // llm-pill — bottom-of-screen pill overlay that WRAPS long text (Raycast toasts/HUDs are
 // single-line). Reads the text from stdin, duration in seconds as argv[1] (default 6).
 // Borderless and non-activating (never steals focus). A thin line along the bottom edge
-// drains as a countdown; hovering pauses it; a click PINS the pill (pin icon appears);
-// a second click closes it.
+// drains as a countdown; hovering pauses it (the pill stays while the cursor is on it);
+// moving the cursor away resumes the remaining countdown, then it fades out.
+//
+// Note: clicks are NOT handled on purpose. A non-activating panel never becomes key, and
+// macOS only delivers mouseDown to such windows when a view opts in via acceptsFirstMouse —
+// a click-to-pin variant would need that override. Hover-pause covers the "keep it" need.
 import AppKit
 
 let cliArgs = CommandLine.arguments
@@ -29,13 +33,11 @@ func resumeLayer(_ layer: CALayer) {
 }
 
 final class PillView: NSVisualEffectView {
-  enum PillState { case counting, pinned, closing }
-  var pillState: PillState = .counting
+  var closing = false
   var remaining: TimeInterval = 6
   var startedAt = Date()
   var closeItem: DispatchWorkItem?
   var progressLayer: CALayer?
-  var pinIcon: NSImageView?
   weak var pillPanel: NSPanel?
 
   func startCountdown(width: CGFloat) {
@@ -67,21 +69,21 @@ final class PillView: NSVisualEffectView {
   }
 
   func pauseCountdown() {
-    guard pillState == .counting else { return }
+    guard !closing else { return }
     closeItem?.cancel()
     remaining = max(0.8, remaining - Date().timeIntervalSince(startedAt))
     if let bar = progressLayer { pauseLayer(bar) }
   }
 
   func resumeCountdown() {
-    guard pillState == .counting else { return }
+    guard !closing else { return }
     if let bar = progressLayer { resumeLayer(bar) }
     scheduleClose()
   }
 
   func beginClose() {
-    guard pillState != .closing else { return }
-    pillState = .closing
+    guard !closing else { return }
+    closing = true
     closeItem?.cancel()
     guard let panel = pillPanel else { NSApp.terminate(nil); return }
     NSAnimationContext.runAnimationGroup(
@@ -99,30 +101,8 @@ final class PillView: NSVisualEffectView {
       rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self, userInfo: nil))
   }
 
-  override func mouseEntered(with event: NSEvent) {
-    NSCursor.pointingHand.push()
-    pauseCountdown()
-  }
-
-  override func mouseExited(with event: NSEvent) {
-    NSCursor.pop()
-    resumeCountdown()
-  }
-
-  override func mouseDown(with event: NSEvent) {
-    switch pillState {
-    case .counting:
-      pillState = .pinned
-      closeItem?.cancel()
-      progressLayer?.removeFromSuperlayer()
-      progressLayer = nil
-      pinIcon?.isHidden = false
-    case .pinned:
-      beginClose()
-    case .closing:
-      break
-    }
-  }
+  override func mouseEntered(with event: NSEvent) { pauseCountdown() }
+  override func mouseExited(with event: NSEvent) { resumeCountdown() }
 }
 
 let app = NSApplication.shared
@@ -169,7 +149,7 @@ panel.level = .statusBar
 panel.isOpaque = false
 panel.backgroundColor = .clear
 panel.hasShadow = true
-panel.ignoresMouseEvents = false // the pill is clickable: click pins, second click closes
+panel.ignoresMouseEvents = false // required for hover tracking (pauses the countdown)
 panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 panel.appearance = NSAppearance(named: .vibrantDark)
 
@@ -185,16 +165,6 @@ effect.pillPanel = panel
 
 label.frame = NSRect(x: hPad, y: vPad, width: textW, height: textH)
 effect.addSubview(label)
-
-let pin = NSImageView(frame: NSRect(x: winW - 20, y: winH - 20, width: 12, height: 12))
-if let img = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "pinned") {
-  pin.image = img
-}
-pin.contentTintColor = NSColor.white.withAlphaComponent(0.55)
-pin.isHidden = true
-effect.addSubview(pin)
-effect.pinIcon = pin
-
 panel.contentView = effect
 
 panel.alphaValue = 0
