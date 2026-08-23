@@ -1,4 +1,8 @@
 import { Clipboard, Toast, getPreferenceValues, showHUD, showToast } from "@raycast/api";
+import { execFileSync, spawn } from "child_process";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import {
   CONFIG_PATH,
   DEFAULT_MODEL,
@@ -14,12 +18,44 @@ interface ChatCompletion {
   choices?: { message?: { content?: string } }[];
 }
 
+const PILL_BIN = path.join(os.homedir(), ".config", "raycast-llm-translate", "bin", "llm-pill");
+const PILL_PIDFILE = path.join(os.tmpdir(), "raycast-llm-translate-pill.pid");
+
 function pillText(t: string): string {
   const oneLine = t.replace(/\s*\n+\s*/g, "  ·  ").trim();
   return oneLine.length > 350 ? `${oneLine.slice(0, 347)}…` : oneLine;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function killPreviousPill() {
+  try {
+    const old = parseInt(fs.readFileSync(PILL_PIDFILE, "utf8").trim(), 10);
+    if (Number.isFinite(old) && old > 1) {
+      const comm = execFileSync("/bin/ps", ["-p", String(old), "-o", "comm="], { encoding: "utf8" }).trim();
+      if (comm.endsWith("llm-pill")) process.kill(old, "SIGTERM");
+    }
+  } catch {
+    // no previous pill (or already gone)
+  }
+}
+
+/** Multi-line wrapping pill via the native overlay helper. Returns false if unavailable. */
+function showPillOverlay(text: string, seconds: number): boolean {
+  try {
+    if (!fs.existsSync(PILL_BIN)) return false;
+    killPreviousPill();
+    const child = spawn(PILL_BIN, [String(seconds)], { detached: true, stdio: ["pipe", "ignore", "ignore"] });
+    if (!child.pid) return false;
+    child.stdin.write(text);
+    child.stdin.end();
+    child.unref();
+    fs.writeFileSync(PILL_PIDFILE, String(child.pid));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default async function TranslateSelectionQuick() {
   const prefs = getPreferenceValues<Preferences>();
@@ -65,12 +101,15 @@ export default async function TranslateSelectionQuick() {
 
     if (prefs.copyQuickResult) await Clipboard.copy(translation);
 
-    // A toast from a closed-window command renders as the bottom pill, and it stays
-    // visible for as long as this command keeps it open — unlike showHUD's fixed ~2 s.
-    toast.style = Toast.Style.Success;
-    toast.title = pillText(translation);
-    await sleep(pillSeconds * 1000);
-    await toast.hide();
+    if (showPillOverlay(translation, pillSeconds)) {
+      await toast.hide();
+    } else {
+      // fallback: Raycast toast is single-line, held open for the configured duration
+      toast.style = Toast.Style.Success;
+      toast.title = pillText(translation);
+      await sleep(pillSeconds * 1000);
+      await toast.hide();
+    }
   } catch (e) {
     const err = e as Error;
     const msg = err.name === "TimeoutError" || err.name === "AbortError" ? "Timed out after 45 s" : err.message;
