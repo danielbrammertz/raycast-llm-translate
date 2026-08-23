@@ -27,12 +27,24 @@ let vPad: CGFloat = 14
 let maxTextW = min(vis.width * 0.55, 760)
 let maxTextH = vis.height * 0.5
 
+let label = NSTextField(wrappingLabelWithString: text)
+label.font = font
+label.textColor = .white
+label.alignment = (text.contains("\n") || text.count > 120) ? .left : .center
+label.lineBreakMode = .byWordWrapping
+label.cell?.truncatesLastVisibleLine = true
+
+// Width estimate from a plain measurement, THEN let the field's own cell compute the
+// height it really needs at that width — boundingRect ignores the cell's internal
+// padding and leading, which re-wraps lines and used to truncate the last ones.
 let measured = (text as NSString).boundingRect(
   with: NSSize(width: maxTextW, height: .greatestFiniteMagnitude),
   options: [.usesLineFragmentOrigin, .usesFontLeading],
   attributes: [.font: font])
-let textW = min(ceil(measured.width) + 2, maxTextW)
-let textH = min(ceil(measured.height) + 2, maxTextH)
+let textW = min(ceil(measured.width) + 8, maxTextW)
+let needed = label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textW, height: 100_000))
+  ?? NSSize(width: textW, height: measured.height * 1.2)
+let textH = min(ceil(needed.height) + 4, maxTextH)
 let winW = textW + 2 * hPad
 let winH = textH + 2 * vPad
 
@@ -56,12 +68,6 @@ effect.wantsLayer = true
 effect.layer?.cornerRadius = 14
 effect.layer?.masksToBounds = true
 
-let label = NSTextField(wrappingLabelWithString: text)
-label.font = font
-label.textColor = .white
-label.alignment = (text.contains("\n") || text.count > 120) ? .left : .center
-label.lineBreakMode = .byWordWrapping
-label.cell?.truncatesLastVisibleLine = true
 label.frame = NSRect(x: hPad, y: vPad, width: textW, height: textH)
 effect.addSubview(label)
 panel.contentView = effect
