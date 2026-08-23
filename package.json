@@ -1,0 +1,69 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "llm-translate",
+  "title": "LLM Translate",
+  "description": "Translate selected text with a fast, cheap LLM via OpenRouter — replacement for the built-in Google translation.",
+  "icon": "extension-icon.png",
+  "author": "danielbrammertz",
+  "license": "MIT",
+  "categories": ["Productivity"],
+  "commands": [
+    {
+      "name": "translate-selection",
+      "title": "Translate Selection",
+      "description": "Translate the currently selected text (falls back to clipboard). German ↔ English by default.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "primaryLanguage",
+      "title": "Primary Language",
+      "description": "Main language to translate into",
+      "type": "textfield",
+      "required": false,
+      "default": "German"
+    },
+    {
+      "name": "secondaryLanguage",
+      "title": "Secondary Language",
+      "description": "Used when the text is already in the primary language",
+      "type": "textfield",
+      "required": false,
+      "default": "English"
+    },
+    {
+      "name": "model",
+      "title": "Model",
+      "description": "OpenRouter model used for translations (must be on the key's allow-list)",
+      "type": "dropdown",
+      "required": false,
+      "default": "google/gemini-2.5-flash-lite",
+      "data": [
+        { "title": "Gemini 2.5 Flash Lite (fastest, default)", "value": "google/gemini-2.5-flash-lite" },
+        { "title": "Gemini 2.5 Flash (higher quality)", "value": "google/gemini-2.5-flash" },
+        { "title": "GPT-4.1 Nano", "value": "openai/gpt-4.1-nano" },
+        { "title": "Mistral Small 3.2", "value": "mistralai/mistral-small-3.2-24b-instruct" }
+      ]
+    },
+    {
+      "name": "apiKey",
+      "title": "OpenRouter API Key",
+      "description": "Optional — leave empty to use ~/.config/raycast-llm-translate/config.json",
+      "type": "password",
+      "required": false
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.104.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.10",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop"
+  }
+}
