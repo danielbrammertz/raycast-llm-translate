@@ -19,11 +19,14 @@ function pillText(t: string): string {
   return oneLine.length > 350 ? `${oneLine.slice(0, 347)}…` : oneLine;
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export default async function TranslateSelectionQuick() {
   const prefs = getPreferenceValues<Preferences>();
   const primary = prefs.primaryLanguage?.trim() || "German";
   const secondary = prefs.secondaryLanguage?.trim() || "English";
   const model = prefs.model || DEFAULT_MODEL;
+  const pillSeconds = parseInt(prefs.pillDuration ?? "6", 10) || 6;
 
   const apiKey = resolveApiKey(prefs.apiKey);
   if (!apiKey) {
@@ -61,13 +64,20 @@ export default async function TranslateSelectionQuick() {
     if (!translation) throw new Error("The model returned an empty translation.");
 
     if (prefs.copyQuickResult) await Clipboard.copy(translation);
+
+    // A toast from a closed-window command renders as the bottom pill, and it stays
+    // visible for as long as this command keeps it open — unlike showHUD's fixed ~2 s.
+    toast.style = Toast.Style.Success;
+    toast.title = pillText(translation);
+    await sleep(pillSeconds * 1000);
     await toast.hide();
-    await showHUD(pillText(translation));
   } catch (e) {
     const err = e as Error;
     const msg = err.name === "TimeoutError" || err.name === "AbortError" ? "Timed out after 45 s" : err.message;
     toast.style = Toast.Style.Failure;
     toast.title = "Translation failed";
     toast.message = msg;
+    await sleep(6000);
+    await toast.hide();
   }
 }

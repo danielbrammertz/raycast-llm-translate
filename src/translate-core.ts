@@ -9,6 +9,7 @@ export interface Preferences {
   model: string;
   apiKey?: string;
   copyQuickResult?: boolean;
+  pillDuration?: string;
 }
 
 export const CONFIG_PATH = path.join(os.homedir(), ".config", "raycast-llm-translate", "config.json");

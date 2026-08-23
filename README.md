@@ -7,9 +7,10 @@ result in a Raycast window — same UX as the built-in translator.
 Two commands:
 
 - **Translate Selection** (the hotkey one) — no window: shows an animated "Translating…" pill
-  at the bottom of the screen, then the translation as a pill that fades after a few seconds —
-  the same UX as the old built-in translator. Optional preference to also copy the result to
-  the clipboard (off by default).
+  at the bottom of the screen, then the translation as a pill — the same UX as the old built-in
+  translator. Pill duration is configurable in the command's settings (default 6 s; Raycast's
+  native HUD can't do this, so the pill is a toast held open by the command). Optional
+  preference to also copy the result to the clipboard (off by default).
 - **Translate Selection (Window)** — full Raycast window with **streaming** output and actions:
   **⏎ paste translation** (replaces the selection in the frontmost app), copy, force direction
   (⌘D → primary, ⌘E → secondary language). Better for long texts, since the pill is one line.

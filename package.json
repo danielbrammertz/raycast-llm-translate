@@ -12,7 +12,25 @@
       "name": "translate-selection",
       "title": "Translate Selection",
       "description": "Translate the selected text (falls back to clipboard) and show the result as a pill at the bottom of the screen — like the built-in translator.",
-      "mode": "no-view"
+      "mode": "no-view",
+      "preferences": [
+        {
+          "name": "pillDuration",
+          "title": "Pill Duration",
+          "description": "How long the translation pill stays on screen",
+          "type": "dropdown",
+          "required": false,
+          "default": "6",
+          "data": [
+            { "title": "2 seconds", "value": "2" },
+            { "title": "4 seconds", "value": "4" },
+            { "title": "6 seconds", "value": "6" },
+            { "title": "8 seconds", "value": "8" },
+            { "title": "12 seconds", "value": "12" },
+            { "title": "20 seconds", "value": "20" }
+          ]
+        }
+      ]
     },
     {
       "name": "translate-selection-window",
