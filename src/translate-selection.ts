@@ -1,4 +1,4 @@
-import { Clipboard, Toast, getPreferenceValues, showHUD, showToast } from "@raycast/api";
+import { Clipboard, Toast, getPreferenceValues, showToast } from "@raycast/api";
 import { execFileSync, spawn } from "child_process";
 import fs from "fs";
 import os from "os";
@@ -58,6 +58,17 @@ function showPillOverlay(text: string, seconds: number): boolean {
 }
 
 export default async function TranslateSelectionQuick() {
+  // Immediate feedback FIRST — before the (slow) selected-text grab, so the pill
+  // area reacts the moment the hotkey is pressed.
+  const toast = await showToast({ style: Toast.Style.Animated, title: "Translating…" });
+  const fail = async (title: string, message?: string, holdMs = 5000) => {
+    toast.style = Toast.Style.Failure;
+    toast.title = title;
+    if (message) toast.message = message;
+    await sleep(holdMs);
+    await toast.hide();
+  };
+
   const prefs = getPreferenceValues<Preferences>();
   const primary = prefs.primaryLanguage?.trim() || "German";
   const secondary = prefs.secondaryLanguage?.trim() || "English";
@@ -66,17 +77,16 @@ export default async function TranslateSelectionQuick() {
 
   const apiKey = resolveApiKey(prefs.apiKey);
   if (!apiKey) {
-    await showHUD(`⚠️ No OpenRouter API key — set it in the extension preferences or ${CONFIG_PATH}`);
+    await fail("No OpenRouter API key", `Set it in the extension preferences or ${CONFIG_PATH}`);
     return;
   }
 
   const input = await getInputText();
   if (!input) {
-    await showHUD("⚠️ No text selected — and the clipboard is empty");
+    await fail("No text selected", "And the clipboard is empty");
     return;
   }
 
-  const toast = await showToast({ style: Toast.Style.Animated, title: "Translating…" });
   try {
     const resp = await fetch(OPENROUTER_URL, {
       method: "POST",
@@ -113,10 +123,6 @@ export default async function TranslateSelectionQuick() {
   } catch (e) {
     const err = e as Error;
     const msg = err.name === "TimeoutError" || err.name === "AbortError" ? "Timed out after 45 s" : err.message;
-    toast.style = Toast.Style.Failure;
-    toast.title = "Translation failed";
-    toast.message = msg;
-    await sleep(6000);
-    await toast.hide();
+    await fail("Translation failed", msg, 6000);
   }
 }
