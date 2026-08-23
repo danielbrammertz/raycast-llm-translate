@@ -4,11 +4,18 @@ Personal replacement for Raycast's built-in (Google-based) translation, which st
 Translates the **selected text in any app** via a fast, cheap LLM on OpenRouter and shows the
 result in a Raycast window — same UX as the built-in translator.
 
-- **German ↔ English by default** (auto-detected; both directions), configurable in preferences.
-- Falls back to the **clipboard** when no text is selected.
-- **Streaming** — first words appear in well under a second with the default model.
-- Actions: **⏎ paste translation** (replaces the selection in the frontmost app), **copy**,
-  force direction (⌘D → primary, ⌘E → secondary language).
+Two commands:
+
+- **Translate Selection** (the hotkey one) — no window: shows an animated "Translating…" pill
+  at the bottom of the screen, then the translation as a pill that fades after a few seconds —
+  the same UX as the old built-in translator. Optional preference to also copy the result to
+  the clipboard (off by default).
+- **Translate Selection (Window)** — full Raycast window with **streaming** output and actions:
+  **⏎ paste translation** (replaces the selection in the frontmost app), copy, force direction
+  (⌘D → primary, ⌘E → secondary language). Better for long texts, since the pill is one line.
+
+Both: **German ↔ English by default** (auto-detected, both directions; configurable) and
+**clipboard fallback** when no text is selected.
 
 ## Setup
 

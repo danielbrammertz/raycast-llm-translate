@@ -1,26 +1,24 @@
 import {
   Action,
   ActionPanel,
-  Clipboard,
   Detail,
   Icon,
   Toast,
   getPreferenceValues,
-  getSelectedText,
   openExtensionPreferences,
   showToast,
 } from "@raycast/api";
 import { useEffect, useMemo, useRef, useState } from "react";
-import fs from "fs";
-import os from "os";
-import path from "path";
-
-interface Preferences {
-  primaryLanguage: string;
-  secondaryLanguage: string;
-  model: string;
-  apiKey?: string;
-}
+import {
+  CONFIG_PATH,
+  DEFAULT_MODEL,
+  OPENROUTER_URL,
+  Preferences,
+  getInputText,
+  openRouterHeaders,
+  resolveApiKey,
+  systemPrompt,
+} from "./translate-core";
 
 interface State {
   loading: boolean;
@@ -29,43 +27,14 @@ interface State {
   error?: string;
 }
 
-const CONFIG_PATH = path.join(os.homedir(), ".config", "raycast-llm-translate", "config.json");
-
-function resolveApiKey(prefKey: string | undefined): string | undefined {
-  if (prefKey && prefKey.trim().length > 0) return prefKey.trim();
-  try {
-    const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8")) as { apiKey?: string };
-    if (cfg.apiKey && cfg.apiKey.trim().length > 0) return cfg.apiKey.trim();
-  } catch {
-    // missing/unreadable config file — reported by caller
-  }
-  return undefined;
-}
-
-async function getInputText(): Promise<{ text: string; source: "selection" | "clipboard" } | undefined> {
-  try {
-    const sel = await getSelectedText();
-    if (sel && sel.trim().length > 0) return { text: sel, source: "selection" };
-  } catch {
-    // no selection in the frontmost app — fall back to clipboard
-  }
-  try {
-    const clip = await Clipboard.readText();
-    if (clip && clip.trim().length > 0) return { text: clip, source: "clipboard" };
-  } catch {
-    // ignore
-  }
-  return undefined;
-}
-
-export default function TranslateSelection() {
+export default function TranslateSelectionWindow() {
   const prefs = useMemo(() => getPreferenceValues<Preferences>(), []);
   const [state, setState] = useState<State>({ loading: true, output: "" });
   const abortRef = useRef<AbortController | null>(null);
 
   const primary = prefs.primaryLanguage?.trim() || "German";
   const secondary = prefs.secondaryLanguage?.trim() || "English";
-  const model = prefs.model || "google/gemini-2.5-flash-lite";
+  const model = prefs.model || DEFAULT_MODEL;
 
   async function translate(forcedTarget?: string) {
     abortRef.current?.abort();
@@ -90,30 +59,17 @@ export default function TranslateSelection() {
 
     setState({ loading: true, output: "", inputSource: input.source });
 
-    const instruction = forcedTarget
-      ? `Translate the user's text into ${forcedTarget}.`
-      : `Detect the language of the user's text. If the text is mainly ${primary}, translate it into ${secondary}; otherwise translate it into ${primary}.`;
-    const system =
-      `You are a translation engine. ${instruction} ` +
-      `Preserve meaning, tone, formatting, line breaks, markdown and emoji. ` +
-      `Output ONLY the translation — no quotes, no explanations, no language labels.`;
-
     try {
-      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const resp = await fetch(OPENROUTER_URL, {
         method: "POST",
         signal: controller.signal,
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://raycast-llm-translate.local",
-          "X-Title": "Raycast LLM Translate",
-        },
+        headers: openRouterHeaders(apiKey),
         body: JSON.stringify({
           model,
           temperature: 0.2,
           stream: true,
           messages: [
-            { role: "system", content: system },
+            { role: "system", content: systemPrompt(primary, secondary, forcedTarget) },
             { role: "user", content: input.text },
           ],
         }),

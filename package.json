@@ -11,7 +11,13 @@
     {
       "name": "translate-selection",
       "title": "Translate Selection",
-      "description": "Translate the currently selected text (falls back to clipboard). German ↔ English by default.",
+      "description": "Translate the selected text (falls back to clipboard) and show the result as a pill at the bottom of the screen — like the built-in translator.",
+      "mode": "no-view"
+    },
+    {
+      "name": "translate-selection-window",
+      "title": "Translate Selection (Window)",
+      "description": "Translate the selected text in a full Raycast window with paste/copy actions — better for long texts.",
       "mode": "view"
     }
   ],
@@ -52,6 +58,15 @@
       "description": "Optional — leave empty to use ~/.config/raycast-llm-translate/config.json",
       "type": "password",
       "required": false
+    },
+    {
+      "name": "copyQuickResult",
+      "title": "Quick Translate",
+      "label": "Copy translation to clipboard",
+      "description": "Also copy the pill translation to the clipboard, so it survives after the pill fades",
+      "type": "checkbox",
+      "required": false,
+      "default": false
     }
   ],
   "dependencies": {
