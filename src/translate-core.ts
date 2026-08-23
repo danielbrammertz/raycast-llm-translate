@@ -60,7 +60,7 @@ export function openRouterHeaders(apiKey: string): Record<string, string> {
   return {
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
-    "HTTP-Referer": "https://raycast-llm-translate.local",
+    "HTTP-Referer": "https://github.com/danielbrammertz/raycast-llm-translate",
     "X-Title": "Raycast LLM Translate",
   };
 }

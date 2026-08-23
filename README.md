@@ -1,65 +1,62 @@
-# LLM Translate (Raycast extension)
+# LLM Translate for Raycast
 
-Personal replacement for Raycast's built-in (Google-based) translation, which stopped working.
-Translates the **selected text in any app** via a fast, cheap LLM on OpenRouter and shows the
-result in a Raycast window — same UX as the built-in translator.
+Select text in **any app**, press a hotkey, and the translation appears as a sleek pill at the
+bottom of your screen — then fades away. Translation is done by a fast, cheap LLM via
+[OpenRouter](https://openrouter.ai). Built as a personal replacement for Raycast's built-in
+(Google-based) translator.
 
-Two commands:
+## Features
 
-- **Translate Selection** (the hotkey one) — no window: shows an animated "Translating…" pill
-  at the bottom of the screen, then the translation as a pill that **wraps long text over
-  multiple lines**. A thin line along the pill's bottom edge drains as the **fade countdown**
-  (duration configurable in the command settings, default 6 s); **hovering pauses** the
-  countdown for as long as the cursor stays on the pill — that's how you keep it around.
-  Raycast's own HUD/toast is single-line and fixed-duration, so the pill is a
-  tiny native overlay helper (`scripts/pill.swift` → installed at
-  `~/.config/raycast-llm-translate/bin/llm-pill` by `scripts/build-pill.sh`; rebuild it after
-  editing the Swift file). If the binary is missing, the command falls back to a single-line
-  Raycast toast. Optional preference to also copy the result to the clipboard (off by default).
-- **Translate Selection (Window)** — full Raycast window with **streaming** output and actions:
-  **⏎ paste translation** (replaces the selection in the frontmost app), copy, force direction
-  (⌘D → primary, ⌘E → secondary language). Better for long texts, since the pill is one line.
+- **Pill overlay** — a native macOS panel, not a notification: wraps long translations over
+  multiple lines, shows a thin **countdown line** that drains until the pill fades,
+  **pauses while you hover** it, never steals keyboard focus. (Raycast's own HUD/toast is
+  single-line with a fixed duration, hence the tiny Swift helper.)
+- **Instant feedback** — an animated "Translating…" indicator appears the moment the hotkey
+  is pressed.
+- **Auto language direction** between two configurable languages (default **German ↔ English**):
+  text in the primary language is translated to the secondary one, everything else to the
+  primary.
+- **Clipboard fallback** when no text is selected.
+- Second command **"Translate Selection (Window)"** — full Raycast window with streaming
+  output and paste / copy / force-direction actions; useful for very long texts.
+- Configurable pill duration and model (defaults to `google/gemini-2.5-flash-lite` — a typical
+  sentence costs around $0.00001).
 
-Both: **German ↔ English by default** (auto-detected, both directions; configurable) and
-**clipboard fallback** when no text is selected.
+## Install
 
-## Setup
+Requires [Raycast](https://raycast.com), Node.js, and the Xcode Command Line Tools (for the
+pill helper).
 
-1. Install (already done on fritz — only needed again if the extension ever disappears from Raycast):
+```bash
+git clone https://github.com/danielbrammertz/raycast-llm-translate.git
+cd raycast-llm-translate
+npm install
+npm run dev        # wait for "ready", then Ctrl-C — the extension stays installed in Raycast
+bash scripts/build-pill.sh   # compiles the pill overlay to ~/.config/raycast-llm-translate/bin/llm-pill
+```
 
-   ```bash
-   cd ~/git/raycast-llm-translate
-   npm install && npm run dev     # wait for "ready", then Ctrl-C — the extension stays installed
-   ```
-
-2. Assign the hotkey: Raycast Settings → Extensions → **LLM Translate → Translate Selection** →
-   Record Hotkey (take over the hotkey from the broken built-in "Translate" extension, and
-   disable that one while you're there).
+Without the pill helper the extension still works and falls back to a single-line Raycast toast.
 
 ## API key
 
-Read from `~/.config/raycast-llm-translate/config.json` (`chmod 600`), falling back to the
-extension preference "OpenRouter API Key" if set. The current key was minted 2026-08-23 via
-Cardea (grant `g_Suy04bdjXEQjKo68Lpqp4A`):
+Get an OpenRouter API key and provide it either
 
-- **$10/month budget, resets monthly** — hard-enforced by OpenRouter Guardrails.
-- **Model allow-list (enforced):** `google/gemini-2.5-flash-lite` (default),
-  `google/gemini-2.5-flash`, `openai/gpt-4.1-nano`, `mistralai/mistral-small-3.2-24b-instruct`.
-- **Expires 2027-08-23** — after that, mint a new key through the Cardea `openrouter` entity
-  (`mint-native-subkey`, same scope) and replace `apiKey` in the config file.
+- in the extension preferences (password field), or
+- in `~/.config/raycast-llm-translate/config.json`:
 
-Check spend anytime:
-
-```bash
-curl -s https://openrouter.ai/api/v1/key \
-  -H "Authorization: Bearer $(jq -r .apiKey ~/.config/raycast-llm-translate/config.json)" \
-  | jq '.data | {usage, limit, limit_remaining}'
+```json
+{ "apiKey": "sk-or-v1-…" }
 ```
 
-A typical sentence costs ~$0.00001, so the cap is roughly a million translations/month.
+(`chmod 600` recommended.) Tip: create a dedicated key with a monthly spend limit and a model
+allow-list — a few dollars per month covers heavy everyday use.
 
-## Cost/model notes
+## Use
 
-Default model is `google/gemini-2.5-flash-lite` ($0.10/M input, $0.40/M output) — the best
-speed/quality/price balance for translation as of 2026-08. Switch models in the extension
-preferences (only allow-listed models work; anything else is rejected by OpenRouter with 404).
+Assign a hotkey in Raycast Settings → Extensions → **LLM Translate → Translate Selection**.
+Select text anywhere, press it, read the pill. Hover the pill to keep it; move away and it
+fades after the configured duration.
+
+## License
+
+MIT
