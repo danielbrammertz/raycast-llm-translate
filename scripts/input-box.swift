@@ -58,6 +58,20 @@ final class Delegate: NSObject, NSWindowDelegate, NSTextFieldDelegate {
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
+// Cmd+V/C/X/A are dispatched via the menu bar's key-equivalent matching — with no menu at
+// all (no nib/storyboard here), AppKit has nothing to route them to, so they're silently
+// swallowed even though the field itself supports paste:/copy:/cut:/selectAll: natively.
+let editMenuItem = NSMenuItem()
+let editMenu = NSMenu(title: "Edit")
+editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+editMenuItem.submenu = editMenu
+let mainMenu = NSMenu()
+mainMenu.addItem(editMenuItem)
+app.mainMenu = mainMenu
+
 // show on the screen the mouse is on — matches pill.swift, and keeps the prompt and the
 // result pill that follows it in the same place.
 let mouse = NSEvent.mouseLocation
