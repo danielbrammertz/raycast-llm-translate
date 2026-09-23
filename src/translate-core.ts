@@ -64,3 +64,73 @@ export function openRouterHeaders(apiKey: string): Record<string, string> {
     "X-Title": "Raycast LLM Translate",
   };
 }
+
+export interface DictionarySense {
+  translation: string;
+  partOfSpeech?: string;
+  note?: string;
+}
+
+export function dictionarySystemPrompt(primary: string, secondary: string): string {
+  return (
+    `You are a bilingual dictionary. The user enters a single ${primary} word or short phrase. ` +
+    `List every distinct ${secondary} meaning/sense of it, the way a good bilingual dictionary would: ` +
+    `one entry per sense if it has several clearly distinct or unrelated meanings (e.g. homonyms, ` +
+    `different registers, idiomatic vs. literal uses), up to about 10 senses ordered from most to least ` +
+    `common; just one entry if it really only has one common meaning. ` +
+    `Respond with ONLY a single JSON object — no markdown code fences, no commentary before or after it — ` +
+    `matching exactly this shape: {"senses":[{"translation":"...","partOfSpeech":"...","note":"..."}]}. ` +
+    `"translation" is the ${secondary} word or short phrase for that sense — never the ${primary} ` +
+    `source word itself. "partOfSpeech" is a short abbreviation such as "n.", "v.", "adj." or "idiom". ` +
+    `"note" is a short (under 12 words), plain-text, disambiguating gloss of that specific sense, ` +
+    `written in ${secondary}.`
+  );
+}
+
+function tryParseJson(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Defensively parses the model's JSON response. Handles ```json fences, stray prose around the
+ *  JSON object, and a model that ignores the object-wrapping instruction and returns a bare array. */
+export function parseDictionarySenses(raw: string): DictionarySense[] | undefined {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  let parsed = tryParseJson(stripped);
+  if (parsed === undefined) {
+    const start = stripped.indexOf("{");
+    const end = stripped.lastIndexOf("}");
+    if (start >= 0 && end > start) parsed = tryParseJson(stripped.slice(start, end + 1));
+  }
+  if (parsed === undefined) return undefined;
+
+  const list = Array.isArray(parsed) ? parsed : (parsed as { senses?: unknown })?.senses;
+  if (!Array.isArray(list)) return undefined;
+
+  const senses = list
+    .filter((s): s is Record<string, unknown> => !!s && typeof s === "object" && typeof s.translation === "string")
+    .map((s) => ({
+      translation: String(s.translation).trim(),
+      partOfSpeech: typeof s.partOfSpeech === "string" ? s.partOfSpeech.trim() : undefined,
+      note: typeof s.note === "string" ? s.note.trim() : undefined,
+    }))
+    .filter((s) => s.translation.length > 0);
+
+  return senses.length > 0 ? senses : undefined;
+}
+
+export function formatDictionaryPill(term: string, senses: DictionarySense[]): string {
+  const lines = senses.map((s, i) => {
+    const pos = s.partOfSpeech ? ` (${s.partOfSpeech})` : "";
+    const note = s.note ? ` — ${s.note}` : "";
+    return `${i + 1}. ${s.translation}${pos}${note}`;
+  });
+  return [`${term} →`, ...lines].join("\n");
+}

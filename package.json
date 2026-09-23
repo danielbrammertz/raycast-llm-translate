@@ -37,6 +37,30 @@
       "title": "Translate Selection (Window)",
       "description": "Translate the selected text in a full Raycast window with paste/copy actions — better for long texts.",
       "mode": "view"
+    },
+    {
+      "name": "dictionary-lookup",
+      "title": "Dictionary Lookup",
+      "description": "Type a word or short phrase in a native prompt and show its distinct meanings/senses as a pill, like a bilingual dictionary.",
+      "mode": "no-view",
+      "preferences": [
+        {
+          "name": "pillDuration",
+          "title": "Pill Duration",
+          "description": "How long the dictionary pill stays on screen",
+          "type": "dropdown",
+          "required": false,
+          "default": "20",
+          "data": [
+            { "title": "2 seconds", "value": "2" },
+            { "title": "4 seconds", "value": "4" },
+            { "title": "6 seconds", "value": "6" },
+            { "title": "8 seconds", "value": "8" },
+            { "title": "12 seconds", "value": "12" },
+            { "title": "20 seconds", "value": "20" }
+          ]
+        }
+      ]
     }
   ],
   "preferences": [

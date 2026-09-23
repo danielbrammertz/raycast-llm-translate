@@ -19,23 +19,30 @@ bottom of your screen — then fades away. Translation is done by a fast, cheap 
 - **Clipboard fallback** when no text is selected.
 - Second command **"Translate Selection (Window)"** — full Raycast window with streaming
   output and paste / copy / force-direction actions; useful for very long texts.
+- Third command **"Dictionary Lookup"** — press its hotkey and a native input prompt appears (no
+  Raycast window, same look as the pill); type a German word or short phrase and get back its
+  distinct English meanings/senses (with part of speech and a short disambiguating gloss) in the
+  same pill — e.g. "Schloss" → castle / lock / clasp. Direction is fixed (primary → secondary
+  language), unlike the auto-detecting hotkey command.
 - Configurable pill duration and model (defaults to `google/gemini-2.5-flash-lite` — a typical
   sentence costs around $0.00001).
 
 ## Install
 
 Requires [Raycast](https://raycast.com), Node.js, and the Xcode Command Line Tools (for the
-pill helper).
+native helpers).
 
 ```bash
 git clone https://github.com/danielbrammertz/raycast-llm-translate.git
 cd raycast-llm-translate
 npm install
 npm run dev        # wait for "ready", then Ctrl-C — the extension stays installed in Raycast
-bash scripts/build-pill.sh   # compiles the pill overlay to ~/.config/raycast-llm-translate/bin/llm-pill
+bash scripts/build-helpers.sh   # compiles the pill + input prompt to ~/.config/raycast-llm-translate/bin/
 ```
 
-Without the pill helper the extension still works and falls back to a single-line Raycast toast.
+Without the pill helper, `Translate Selection` still works and falls back to a single-line
+Raycast toast. `Dictionary Lookup` needs the input-prompt helper to have anywhere to type into —
+without it, it shows a clear error toast telling you to run the build script above.
 
 ## API key
 
@@ -56,6 +63,11 @@ allow-list — a few dollars per month covers heavy everyday use.
 Assign a hotkey in Raycast Settings → Extensions → **LLM Translate → Translate Selection**.
 Select text anywhere, press it, read the pill. Hover the pill to keep it; move away and it
 fades after the configured duration.
+
+**Dictionary Lookup** works differently since there's nothing to select: assign it its own hotkey
+(same Settings page), press it, and a native input prompt appears — no Raycast window, just the
+prompt. Type a word or phrase and press Enter; its meanings show up in the same pill — hover to
+keep it up, move away and it fades. Escape, or clicking away from the prompt, cancels it.
 
 ## License
 

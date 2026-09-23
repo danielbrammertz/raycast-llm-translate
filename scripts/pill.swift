@@ -2,11 +2,13 @@
 // single-line). Reads the text from stdin, duration in seconds as argv[1] (default 6).
 // Borderless and non-activating (never steals focus). A thin line along the bottom edge
 // drains as a countdown; hovering pauses it (the pill stays while the cursor is on it);
-// moving the cursor away resumes the remaining countdown, then it fades out.
+// moving the cursor away resumes the remaining countdown, then it fades out. A small close
+// button in the top-right corner dismisses it immediately.
 //
-// Note: clicks are NOT handled on purpose. A non-activating panel never becomes key, and
-// macOS only delivers mouseDown to such windows when a view opts in via acceptsFirstMouse —
-// a click-to-pin variant would need that override. Hover-pause covers the "keep it" need.
+// Note: the pill body itself still doesn't handle clicks — a non-activating panel never
+// becomes key, and macOS only delivers mouseDown to views that opt in via acceptsFirstMouse.
+// Only CloseButton opts in, scoped to that one small view, so the rest of the pill stays
+// click-through and the panel never steals focus.
 import AppKit
 
 let cliArgs = CommandLine.arguments
@@ -105,6 +107,34 @@ final class PillView: NSVisualEffectView {
   override func mouseExited(with event: NSEvent) { resumeCountdown() }
 }
 
+/// Small top-right close affordance. The only clickable part of the pill: opts into
+/// acceptsFirstMouse so its click is delivered despite the panel being non-activating.
+final class CloseButton: NSImageView {
+  var onClick: (() -> Void)?
+  let dim = NSColor.white.withAlphaComponent(0.45)
+  let bright = NSColor.white.withAlphaComponent(0.95)
+
+  override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+  override func mouseDown(with event: NSEvent) { onClick?() }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    trackingAreas.forEach(removeTrackingArea)
+    addTrackingArea(NSTrackingArea(
+      rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self, userInfo: nil))
+  }
+
+  override func mouseEntered(with event: NSEvent) {
+    NSCursor.pointingHand.push()
+    contentTintColor = bright
+  }
+
+  override func mouseExited(with event: NSEvent) {
+    NSCursor.pop()
+    contentTintColor = dim
+  }
+}
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 
@@ -117,7 +147,9 @@ let vis = screen.visibleFrame
 let font = NSFont.systemFont(ofSize: 15, weight: .medium)
 let hPad: CGFloat = 20
 let vPad: CGFloat = 14
-let maxTextW = min(vis.width * 0.55, 760)
+let closeSize: CGFloat = 14
+let closeGutter: CGFloat = 24 // extra width reserved on the right for the close button
+let maxTextW = min(vis.width * 0.55, 760) - closeGutter
 let maxTextH = vis.height * 0.5
 
 let label = NSTextField(wrappingLabelWithString: text)
@@ -138,7 +170,7 @@ let textW = min(ceil(measured.width) + 8, maxTextW)
 let needed = label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textW, height: 100_000))
   ?? NSSize(width: textW, height: measured.height * 1.2)
 let textH = min(ceil(needed.height) + 4, maxTextH)
-let winW = textW + 2 * hPad
+let winW = textW + 2 * hPad + closeGutter
 let winH = textH + 2 * vPad
 
 let panel = NSPanel(
@@ -165,6 +197,13 @@ effect.pillPanel = panel
 
 label.frame = NSRect(x: hPad, y: vPad, width: textW, height: textH)
 effect.addSubview(label)
+
+let closeBtn = CloseButton(frame: NSRect(x: winW - 6 - closeSize, y: winH - 8 - closeSize, width: closeSize, height: closeSize))
+closeBtn.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "Close")
+closeBtn.contentTintColor = closeBtn.dim
+closeBtn.onClick = { [weak effect] in effect?.beginClose() }
+effect.addSubview(closeBtn)
+
 panel.contentView = effect
 
 panel.alphaValue = 0

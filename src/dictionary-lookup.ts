@@ -4,12 +4,14 @@ import {
   DEFAULT_MODEL,
   OPENROUTER_URL,
   Preferences,
-  getInputText,
+  dictionarySystemPrompt,
+  formatDictionaryPill,
   openRouterHeaders,
+  parseDictionarySenses,
   resolveApiKey,
-  systemPrompt,
 } from "./translate-core";
 import { pillText, showPillOverlay } from "./pill";
+import { inputBoxAvailable, showInputBox } from "./input-box";
 
 interface ChatCompletion {
   choices?: { message?: { content?: string } }[];
@@ -17,10 +19,22 @@ interface ChatCompletion {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export default async function TranslateSelectionQuick() {
-  // Immediate feedback FIRST — before the (slow) selected-text grab, so the pill
-  // area reacts the moment the hotkey is pressed.
-  const toast = await showToast({ style: Toast.Style.Animated, title: "Translating…" });
+export default async function DictionaryLookup() {
+  if (!inputBoxAvailable()) {
+    await showToast({
+      style: Toast.Style.Failure,
+      title: "Input helper not built",
+      message: "Run scripts/build-helpers.sh, then try again",
+    });
+    return;
+  }
+
+  // Shown BEFORE any toast — Raycast's own window never appears in this flow, just the native
+  // prompt, so there's nothing to show a toast over yet.
+  const term = await showInputBox("German word or phrase…");
+  if (!term) return; // cancelled (Escape, clicked away, or left empty)
+
+  const toast = await showToast({ style: Toast.Style.Animated, title: "Looking up…" });
   const fail = async (title: string, message?: string, holdMs = 5000) => {
     toast.style = Toast.Style.Failure;
     toast.title = title;
@@ -33,17 +47,11 @@ export default async function TranslateSelectionQuick() {
   const primary = prefs.primaryLanguage?.trim() || "German";
   const secondary = prefs.secondaryLanguage?.trim() || "English";
   const model = prefs.model || DEFAULT_MODEL;
-  const pillSeconds = parseInt(prefs.pillDuration ?? "6", 10) || 6;
+  const pillSeconds = parseInt(prefs.pillDuration ?? "20", 10) || 20;
 
   const apiKey = resolveApiKey(prefs.apiKey);
   if (!apiKey) {
     await fail("No OpenRouter API key", `Set it in the extension preferences or ${CONFIG_PATH}`);
-    return;
-  }
-
-  const input = await getInputText();
-  if (!input) {
-    await fail("No text selected", "And the clipboard is empty");
     return;
   }
 
@@ -55,9 +63,10 @@ export default async function TranslateSelectionQuick() {
       body: JSON.stringify({
         model,
         temperature: 0.2,
+        response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: systemPrompt(primary, secondary) },
-          { role: "user", content: input.text },
+          { role: "system", content: dictionarySystemPrompt(primary, secondary) },
+          { role: "user", content: term },
         ],
       }),
     });
@@ -66,23 +75,25 @@ export default async function TranslateSelectionQuick() {
       throw new Error(`OpenRouter ${resp.status}: ${bodyText.slice(0, 200)}`);
     }
     const data = (await resp.json()) as ChatCompletion;
-    const translation = data.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!translation) throw new Error("The model returned an empty translation.");
+    const raw = data.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!raw) throw new Error("The model returned an empty response.");
 
-    if (prefs.copyQuickResult) await Clipboard.copy(translation);
+    const senses = parseDictionarySenses(raw);
+    const pill = senses ? formatDictionaryPill(term, senses) : raw;
 
-    if (showPillOverlay(translation, pillSeconds)) {
+    if (prefs.copyQuickResult) await Clipboard.copy(pill);
+
+    if (showPillOverlay(pill, pillSeconds)) {
       await toast.hide();
     } else {
-      // fallback: Raycast toast is single-line, held open for the configured duration
       toast.style = Toast.Style.Success;
-      toast.title = pillText(translation);
+      toast.title = pillText(pill);
       await sleep(pillSeconds * 1000);
       await toast.hide();
     }
   } catch (e) {
     const err = e as Error;
     const msg = err.name === "TimeoutError" || err.name === "AbortError" ? "Timed out after 45 s" : err.message;
-    await fail("Translation failed", msg, 6000);
+    await fail("Dictionary lookup failed", msg, 6000);
   }
 }
