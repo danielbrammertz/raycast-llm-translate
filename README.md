@@ -11,6 +11,12 @@ bottom of your screen — then fades away. Translation is done by a fast, cheap 
   multiple lines, shows a thin **countdown line** that drains until the pill fades,
   **pauses while you hover** it, never steals keyboard focus. (Raycast's own HUD/toast is
   single-line with a fixed duration, hence the tiny Swift helper.)
+- **Explain a word while translating English → German** — when the hotkey command translates
+  *into* your primary language, the pill splits: the original text on top (smaller font,
+  selectable), the translation below. Double-click or drag-select a word/phrase in the original
+  text and the bottom area swaps to an elaborate, learner-dictionary-style explanation of it —
+  meaning in context, other senses, origin, and a few translations — with the full sentence sent
+  along as context. Deselect to go back to the plain translation.
 - **Instant feedback** — an animated "Translating…" indicator appears the moment the hotkey
   is pressed.
 - **Auto language direction** between two configurable languages (default **German ↔ English**):

@@ -134,3 +134,48 @@ export function formatDictionaryPill(term: string, senses: DictionarySense[]): s
   });
   return [`${term} →`, ...lines].join("\n");
 }
+
+export interface QuickTranslateResult {
+  targetLanguage: string;
+  translation: string;
+}
+
+/** Same auto-detect direction as systemPrompt(), but reports which way it went — the caller
+ *  needs that to decide whether to show the interactive split pill (target = primary). Kept
+ *  separate from systemPrompt() rather than extended: that function is shared with the
+ *  streaming window command and its "output ONLY the translation" instruction would directly
+ *  contradict an appended JSON-wrapping instruction. */
+export function quickTranslateSystemPrompt(primary: string, secondary: string): string {
+  return (
+    `You are a translation engine. Detect the language of the user's text. If the text is ` +
+    `mainly ${primary}, translate it into ${secondary} and set "targetLanguage" to "${secondary}"; ` +
+    `otherwise translate it into ${primary} and set "targetLanguage" to "${primary}". Preserve ` +
+    `meaning, tone, formatting, line breaks, markdown and emoji in the translation. ` +
+    `Respond with ONLY a single JSON object — no markdown code fences, no commentary before or ` +
+    `after it — matching exactly this shape: {"targetLanguage":"...","translation":"..."}. ` +
+    `"targetLanguage" must be exactly "${primary}" or "${secondary}". "translation" is the ` +
+    `translated text only — no quotes, no explanations, no language labels.`
+  );
+}
+
+/** Same defensive strategy as parseDictionarySenses. */
+export function parseQuickTranslateResult(raw: string): QuickTranslateResult | undefined {
+  const stripped = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  let parsed = tryParseJson(stripped);
+  if (parsed === undefined) {
+    const start = stripped.indexOf("{");
+    const end = stripped.lastIndexOf("}");
+    if (start >= 0 && end > start) parsed = tryParseJson(stripped.slice(start, end + 1));
+  }
+  if (parsed === undefined) return undefined;
+
+  const obj = parsed as { targetLanguage?: unknown; translation?: unknown };
+  if (typeof obj.targetLanguage !== "string" || typeof obj.translation !== "string") return undefined;
+  const translation = obj.translation.trim();
+  if (!translation) return undefined;
+  return { targetLanguage: obj.targetLanguage.trim(), translation };
+}

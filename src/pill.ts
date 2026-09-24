@@ -39,3 +39,37 @@ export function showPillOverlay(text: string, seconds: number): boolean {
     return false;
   }
 }
+
+export interface SplitPillPayload {
+  originalText: string;
+  translation: string;
+  primaryLanguage: string;
+  secondaryLanguage: string;
+  apiKey: string;
+  model: string;
+}
+
+/** Split pill: original text on top (selectable — double-click/drag a word for an elaborate
+ *  explanation), translation on the bottom. The pill binary makes that follow-up OpenRouter call
+ *  itself once spawned; this process doesn't stay alive to broker it. Same binary as
+ *  showPillOverlay (only one pill on screen at a time, enforced by the shared PID file/process
+ *  name check in killPreviousPill — no separate bookkeeping needed for this mode). Returns false
+ *  if unavailable, so the caller can fall back to the plain pill. */
+export function showSplitPillOverlay(payload: SplitPillPayload, seconds: number): boolean {
+  try {
+    if (!fs.existsSync(PILL_BIN)) return false;
+    killPreviousPill();
+    const child = spawn(PILL_BIN, [String(seconds), "--split"], {
+      detached: true,
+      stdio: ["pipe", "ignore", "ignore"],
+    });
+    if (!child.pid) return false;
+    child.stdin.write(JSON.stringify(payload));
+    child.stdin.end();
+    child.unref();
+    fs.writeFileSync(PILL_PIDFILE, String(child.pid));
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -6,10 +6,11 @@ import {
   Preferences,
   getInputText,
   openRouterHeaders,
+  parseQuickTranslateResult,
+  quickTranslateSystemPrompt,
   resolveApiKey,
-  systemPrompt,
 } from "./translate-core";
-import { pillText, showPillOverlay } from "./pill";
+import { pillText, showPillOverlay, showSplitPillOverlay } from "./pill";
 
 interface ChatCompletion {
   choices?: { message?: { content?: string } }[];
@@ -55,8 +56,9 @@ export default async function TranslateSelectionQuick() {
       body: JSON.stringify({
         model,
         temperature: 0.2,
+        response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: systemPrompt(primary, secondary) },
+          { role: "system", content: quickTranslateSystemPrompt(primary, secondary) },
           { role: "user", content: input.text },
         ],
       }),
@@ -66,12 +68,24 @@ export default async function TranslateSelectionQuick() {
       throw new Error(`OpenRouter ${resp.status}: ${bodyText.slice(0, 200)}`);
     }
     const data = (await resp.json()) as ChatCompletion;
-    const translation = data.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!translation) throw new Error("The model returned an empty translation.");
+    const raw = data.choices?.[0]?.message?.content?.trim() ?? "";
+    if (!raw) throw new Error("The model returned an empty translation.");
+
+    const parsed = parseQuickTranslateResult(raw);
+    const translation = parsed?.translation ?? raw; // never lose a good translation over a formatting hiccup
 
     if (prefs.copyQuickResult) await Clipboard.copy(translation);
 
-    if (showPillOverlay(translation, pillSeconds)) {
+    // Interactive split pill (original text + click-to-explain-a-word) only when translating
+    // INTO the primary language — that's the "explain this English word" direction. Falls
+    // through to the plain pill for the reverse direction, and if the split pill can't be shown.
+    const isPrimaryTarget = parsed?.targetLanguage.trim().toLowerCase() === primary.trim().toLowerCase();
+    if (
+      isPrimaryTarget &&
+      showSplitPillOverlay({ originalText: input.text, translation, primaryLanguage: primary, secondaryLanguage: secondary, apiKey, model }, pillSeconds)
+    ) {
+      await toast.hide();
+    } else if (showPillOverlay(translation, pillSeconds)) {
       await toast.hide();
     } else {
       // fallback: Raycast toast is single-line, held open for the configured duration
